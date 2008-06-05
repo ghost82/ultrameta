@@ -80,14 +80,10 @@ class _object(object):
     
     @classmethod
     def _sorted_properties(cls):
-        
-        def sort_key(keyed_meta_data):
-            return keyed_meta_data[1][0]
-            
         properties = cls.__ultra__.items()
-        properties.sort(key=sort_key)
-        
+        properties.sort(key=lambda x: x[1][0])
         return [(i[0], i[1][1]) for i in properties]
+        
         
 if __name__ == '__main__':
 
