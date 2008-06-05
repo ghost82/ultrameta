@@ -22,4 +22,8 @@ class value(object):
         if isinstance(val, str):
             val = len(val)
         return val == self.required_value
+        
+length = value
+
+
 
