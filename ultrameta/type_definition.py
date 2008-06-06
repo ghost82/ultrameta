@@ -1,5 +1,9 @@
 #/usr/bin/env python
 
+# TODO:
+
+# understand what int or None type would be and how to represent it.
+
 import containers
 
 leaf_name = 'leaf'
