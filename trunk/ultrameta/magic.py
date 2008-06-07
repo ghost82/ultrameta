@@ -1,6 +1,7 @@
 #/usr/bin/env python
 
 import type_definition
+from types import FunctionType
     
 class _descriptor(object):
 
@@ -48,6 +49,8 @@ class _property(object):
                 instance.__dict__[attr] = self._type_definition.proxy(val)
             else:
                 raise TypeError('%s is type %s not %s' % (val, type(val), self._type_definition))
+            if getattr(instance, '__ultra_invariant_checks__', False):
+                instance.__ultra_do_invariant_checks__()
                 
         return write_method
         
@@ -55,16 +58,73 @@ class _property(object):
         reader = self.create_default_read_method(attr)
         writer = self.create_default_write_method(attr)
         return _descriptor(reader, writer)
+        
+class _identity(_property):
+
+    def __init__(self, prototype):
+        super(_identity, self).__init__(prototype)
+        
+    def create_eq(self, attr):
+        def eq(self, other):
+            return getattr(self, attr) == getattr(other, attr)
+        return eq
+        
+    def create_ne(self, attr):
+        def ne(self, other):
+            return getattr(self, attr) != getattr(other, attr)
+        return ne
+        
+    def create_hash(self, attr):
+        def hash(self):
+            return self.attr.__hash__()
+        return hash
+
+### move the various invariant check functions to the property objects
+### not the main instance.
+        
+def _invariant(boolean_op):
+    boolean_op.__is_an_invariant__ = True
+    return boolean_op
+
+def _invariant_checked(method):
+    def invariants_checked(*args, **kwargs):
+        if isinstance(args[0], _object):
+            try:
+                args[0].__ultra_invariant_checks__ = False
+                t = method(*args, **kwargs)
+            finally:
+                args[0].__ultra_invariant_checks__ = True
+                args[0].__ultra_do_invariant_checks__()
+            return t
+        else:
+            return method(*args, **kwargs)
+    return invariants_checked
 
 class _meta(type):
 
     def __new__(cls, name, bases, dict):
+
         mods = {}
+        id = None
+        invariants = []
         for k, v in dict.iteritems():
             if isinstance(v, _property):
                 mods[k] = v.create_property(k)
+                if isinstance(v, _identity):
+                    if id is None:
+                        id = (v, k)
+                    else:
+                        ValueError("Multiple identities not allowed.")
+            if getattr(v, '__is_an_invariant__', False) == True:
+                invariants.append(v)
+                
+        if len(invariants) > 0:
+            for k, v in dict.iteritems():
+                if isinstance(v, FunctionType):
+                    dict[k] = _invariant_checked(v)
+                
         if len(mods) > 0:
-            dict['__ultra__'] = {}
+            dict.setdefault('__ultra__', {})
             for k, v in mods.iteritems():
                 dict['__ultra__'][k] = dict[k].meta_data
                 dict[k] = v
@@ -72,19 +132,33 @@ class _meta(type):
             for k in dict['__ultra__']:
                 dict['__ultra__'][k][0] = dict['__ultra__'][k][0] - lowest_property
             _property.order = 0
+
+        if id is not None:
+            v, k = id
+            dict['__eq__'] = v.create_eq(k)
+            dict['__ne__'] = v.create_ne(k)
+            dict['__hash__'] = v.create_hash(k)
+            
+        dict['__ultra_invariants__'] = invariants
+        
         t = super(_meta, cls).__new__(cls, name, bases, dict)
         return t
 
 class _object(object):
     __metaclass__ = _meta
     
+    def __ultra_do_invariant_checks__(self):
+        if self.__ultra_invariant_checks__:
+            for invariant in self.__class__.__ultra_invariants__:
+                if not invariant(self):
+                    raise ValueError('Invariant has been violated')
+    
     @classmethod
     def _sorted_properties(cls):
         properties = cls.__ultra__.items()
         properties.sort(key=lambda x: x[1][0])
         return [(i[0], i[1][1]) for i in properties]
-        
-        
+                
 if __name__ == '__main__':
 
     import unittest
@@ -132,6 +206,28 @@ if __name__ == '__main__':
             self.assertEqual(i.b, 1)
             self.assertEqual(type(i).__ultra__['a'][0], 1)
             self.assertEqual(type(i).__ultra__['b'][0], 0)
+            
+        def test_identity(self):
+            
+            class u(_object):
+                a = _identity(str)
+                b = _property(int)
+
+                def __init__(self, init_a, init_b):
+                    super(u, self).__init__()
+                    self.a = init_a
+                    self.b = init_b
+                    
+            i = u('one', 1)
+            self.assertEqual(i.a, 'one')
+            self.assertEqual(i.b, 1)
+            self.assertEqual(type(i).__ultra__['a'][0], 0)
+            self.assertEqual(type(i).__ultra__['b'][0], 1)
+            
+            j = u('one', 2)
+            self.assertEqual(i, j)
+            j.a = 'two'
+            self.assertNotEqual(i, j)
             
         def test_collections(self):
             
@@ -197,6 +293,40 @@ if __name__ == '__main__':
             self.assertEqual(i.a, [[1, 2], [3, 4]])
             self.assertRaises(TypeError, i.a.append, 4)
             self.assertRaises(TypeError, i.a.append, ['a', 'b'])
+            
+        def test_invariant(self):
+            
+            class u(_object):
+                a = _property(int)
+                b = _property(str)
+                
+                def __init__(self, a = 0, b = ''):
+                    super(u, self).__init__()
+                    self.a = a
+                    self.b = b
+                    
+                @_invariant
+                def verify(self):
+                    return len(self.b) == self.a
+                    
+                def modify(self, a, b):
+                    self.a = a
+                    self.b = b
+                    
+                @classmethod
+                def foo(cls, bar):
+                    print cls
+
+                @staticmethod
+                def bar():
+                    print 'bar'
+                    
+            i = u()
+            i.modify(4, 'four')
+            i.a = 3
+            i.foo(4)
+            i.bar()
+            
             
     suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
     unittest.TextTestRunner(verbosity=2).run(suite)

@@ -173,9 +173,8 @@ if __name__ == '__main__':
             self.assertEqual(test_b2.third, self.test_b.third)
             
         def test_containment(self):
-            print ElementTree.tostring(self.test_c.to_xml())
             test_c2 = c.from_xml(self.test_c.to_xml())
-            
-            
+            self.assertEqual(test_c2.first[0].first, self.test_c.first[0].first)        
+                
     suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
     unittest.TextTestRunner(verbosity=2).run(suite)

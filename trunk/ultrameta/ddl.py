@@ -2,6 +2,10 @@
 
 from magic import _object
 
+# TODO
+
+# How shall we store sequences, mappings, and tuples in the database?
+
 class _ddl(object):
 
     ddl_types = { int : 'INTEGER', str : 'VARCHAR(255)' }

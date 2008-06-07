@@ -18,7 +18,7 @@ _container_definitions = {
     dict : (containers.dictionary_proxy, mapping_name) }
     
 _type_match = {
-    leaf_name: lambda self, val: isinstance(val, self._type),
+    leaf_name: lambda self, val: self._type is None or isinstance(val, self._type),
 
     tuple_name: lambda self, val: (isinstance(val, self._container) and
                     all(self.contents_match(i, pos) for pos, i in enumerate(val)) and
