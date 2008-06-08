@@ -46,7 +46,8 @@ class _property(object):
     
         def write_method(instance, val):
             if self._type_definition.type_match(val):
-                instance.__dict__[attr] = self._type_definition.proxy(val)
+                instance.__dict__[attr] = self._type_definition.proxy(val, 
+                    instance.__ultra_do_invariant_checks__)
             else:
                 raise TypeError('%s is type %s not %s' % (val, type(val), self._type_definition))
             if getattr(instance, '__ultra_invariant_checks__', False):
@@ -148,7 +149,7 @@ class _object(object):
     __metaclass__ = _meta
     
     def __ultra_do_invariant_checks__(self):
-        if self.__ultra_invariant_checks__:
+        if getattr(self, '__ultra_invariant_checks__', False):
             for invariant in self.__class__.__ultra_invariants__:
                 if not invariant(self):
                     raise ValueError('Invariant has been violated')
@@ -298,12 +299,15 @@ if __name__ == '__main__':
             
             class u(_object):
                 a = _property(int)
-                b = _property(str)
+                b = _property([str])
                 
-                def __init__(self, a = 0, b = ''):
+                def __init__(self, a = 0, b = None):
                     super(u, self).__init__()
                     self.a = a
-                    self.b = b
+                    if b is None:
+                        self.b = []
+                    else:
+                        self.b = b
                     
                 @_invariant
                 def verify(self):
@@ -315,14 +319,17 @@ if __name__ == '__main__':
                     
                 @classmethod
                 def foo(cls, bar):
-                    print cls
-
+                    pass
+                    
                 @staticmethod
                 def bar():
-                    print 'bar'
+                    pass
                     
             i = u()
-            i.modify(4, 'four')
+            i.modify(2, ['one', 'two'])
+            self.assertRaises(ValueError, setattr, i, 'a', 3)
+            i.a = 2
+            self.assertRaises(ValueError, i.b.append, 'three')
             i.a = 3
             i.foo(4)
             i.bar()

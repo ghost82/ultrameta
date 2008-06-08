@@ -5,6 +5,7 @@
 # understand what int or None type would be and how to represent it.
 
 import containers
+import utils
 
 leaf_name = 'leaf'
 tuple_name = 'tuple'
@@ -42,9 +43,13 @@ _contents_match = {
 
 class specification(object):
 
-    def __init__(self, prototype, **restrictions):
+    def __init__(self, prototype, invariants = None, **restrictions):
         self.prototype = prototype
         self.restrictions = restrictions
+        if invariants is None:
+            self.invariants = []
+        else:
+            self.invariants = invariants
         
 class _type_definition(object):
 
@@ -55,7 +60,7 @@ class _type_definition(object):
         else:
             prototype = argument
             self.restrictions = kwargs
-            
+        
         if prototype is not None and type(prototype) in _container_definitions:
             self._container = type(prototype)
             self._proxy, self._category = _container_definitions[type(prototype)]
@@ -82,11 +87,11 @@ class _type_definition(object):
     def contents_match(self, val, key = None):
         return _contents_match[self._category](self, val, key)
 
-    def proxy(self, val):
+    def proxy(self, val, do_invariant_checks):
         if self._category == leaf_name:
             return val
         else:
-            return self._proxy(val).withtype(self)
+            return self._proxy(val).withtype(self).withinvariants(do_invariant_checks)
 
     def _type_repr(self):
         if self._category == leaf_name:
