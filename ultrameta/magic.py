@@ -2,6 +2,7 @@
 
 import type_definition
 from types import FunctionType
+from utils import replace_none
     
 class _descriptor(object):
 
@@ -237,10 +238,7 @@ if __name__ == '__main__':
                 
                 def __init__(self, init_a = None):
                     super(u, self).__init__()
-                    if init_a is None:
-                        self.a = []
-                    else:
-                        self.a = init_a
+                    self.a = replace_none(init_a, [])
                         
             i = u()
             
@@ -262,10 +260,7 @@ if __name__ == '__main__':
                 
                 def __init__(self, init_a = None):
                     super(u, self).__init__()
-                    if init_a is None:
-                        self.a = {}
-                    else:
-                        self.a = init_a
+                    self.a = replace_none(init_a, {})
                         
             i = u()
             
@@ -274,6 +269,7 @@ if __name__ == '__main__':
             self.assertEqual(i.a, { 1 : 'one', 2 : 'two' })
             self.assertRaises(TypeError, setattr, i, 'a', { 1 : 1.0, 2 : 2.0 })
             i.a[3] = 'three'
+            print type(i.a)
             self.assertEqual(i.a[3], 'three')
             self.assertRaises(TypeError, i.a.__setitem__, 3, 3.0)
             
@@ -284,10 +280,7 @@ if __name__ == '__main__':
                 
                 def __init__(self, init_a = None):
                     super(u, self).__init__()
-                    if init_a is None:
-                        self.a = []
-                    else:
-                        self.a = init_a
+                    self.a = replace_none(init_a, [])
                         
             i = u()
             i.a = [[1, 2], [3, 4]]
@@ -304,10 +297,7 @@ if __name__ == '__main__':
                 def __init__(self, a = 0, b = None):
                     super(u, self).__init__()
                     self.a = a
-                    if b is None:
-                        self.b = []
-                    else:
-                        self.b = b
+                    self.b = replace_none(b, [])
                     
                 @_invariant
                 def verify(self):

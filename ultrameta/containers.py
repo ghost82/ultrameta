@@ -1,94 +1,81 @@
 ﻿#/usr/bin/env python
 
-class list_proxy(list):
+from utils import replace_none
+from itertools import izip
 
-    def __init__(self, val):
-        super(list_proxy, self).__init__(val)
-        self._type_definition = None
-        self._do_invariant_checks = None
+def _invariant_checked(self, func):
+    
+    def wrapper(val):
+        func(val)
+        self._invariant_checks()
         
+    return wrapper
+    
+class _withMixin(object):
+
+    def _with(self, type_definition = None, invariant_checks = None):
+        self._type_definition = replace_none(getattr(self, '_type_definition', None), type_definition)
+        self._invariant_checks = replace_none(getattr(self, '_invariant_checks', None), invariant_checks)
+        
+        methods, proxies = self.proxy_definitions()
+        if self._type_definition:
+            for method, proxy in izip(methods, proxies):
+                setattr(self, method, proxy)
+        if self._invariant_checks:
+            for method in methods:
+                setattr(self, method, _invariant_checked(self, getattr(self, method)))
+
+        return self             
+
     def withtype(self, type_definition):
         if not type_definition.type_match(self):
             raise TypeError()
+        return self._with(type_definition = type_definition)
+        
+    def withinvariants(self, invariant_checks):
+        invariant_checks()
+        return self._with(invariant_checks = invariant_checks)
+        
+    def proxy_definitions(self):
+        # this is meant to be overridden
+        return [], []
 
-        self._type_definition = type_definition
-        self.append = self._append_type_safe
-        self.__setslice__ = self._setslice_type_safe
-        return self
-        
-    def withinvariants(self, do_invariant_checks):
-        do_invariant_checks()
-        
-        self._do_invariant_checks = do_invariant_checks
-        self.append = self._append_type_safe
-        self.__setslice__ = self._setslice_type_safe
-        return self
-        
+class list_proxy(list, _withMixin):
+
+    def proxy_definitions(self):
+        methods = ['append', '__setslice__']
+        proxies = [self._append_type_safe, self._setslice_type_safe]
+        return methods, proxies
+
     def _append_type_safe(self, val):
         if self._type_definition.contents_match(val, None):
             super(list_proxy, self).append(val)
         else:
             raise TypeError('%s is a %s and cannot be appended to a %s' % 
                 (val, type(val), self._type_definition))
-        self._do_invariant_checks()
 
-            
     def _setslice_type_safe(self, i, j, val):
         if self._type_definition.type_match(val):
             return super(list_proxy, self).__setslice__(i, j, val)
         else:
             raise TypeError('%s is not a %s' % (val, self._type_definition))        
-        self._do_invariant_checks()
 
             
-class tuple_proxy(tuple):
+class tuple_proxy(tuple, _withMixin):
+    pass
     
-    def __init__(self, val, do_invariant_checks = None):
-        super(tuple_proxy, self).__init__(val)
-        self._type_definition = None
-        self._do_invariant_checks = None
+class dictionary_proxy(dict, _withMixin):
 
-    def withtype(self, type_definition):
-        if not type_definition.type_match(self):
-            raise TypeError()
+    def proxy_definitions(self):
+        methods = ['__setitem__']
+        proxies = [self._setitem_type_safe]
+        return methods, proxies
 
-        self._type_definition = type_definition
-        return self
-        
-    def withinvariants(self, do_invariant_checks):
-        do_invariant_checks()
-        
-        self._do_invariant_checks = do_invariant_checks
-        return self
-        
-class dictionary_proxy(dict):
-    
-    def __init__(self, val):
-        super(dictionary_proxy, self).__init__(val)
-        self._type_definition = None
-        self._do_invariant_checks = None
-        
-    def withtype(self, type_definition):
-        if not type_definition.type_match(self):
-            raise TypeError()
-
-        self._type_definition = type_definition
-        self.__setitem__ = self._setitem_type_safe
-        return self
-        
-    def withinvariants(self, do_invariant_checks):
-        do_invariant_checks()
-        
-        self._do_invariant_checks = do_invariant_checks
-        self.__setitem__ = self._setitem_type_safe
-        return self
-        
     def _setitem_type_safe(self, key, val):
         if self._type_definition.contents_match(val, key):
             super(dictionary_proxy, self).__setitem__(key, val)
         else:
             raise TypeError('%s is not a %s' % ((key, val), self._type_definition))
-        self._do_invariant_checks()
         
 if __name__ == '__main__':
     import unittest
