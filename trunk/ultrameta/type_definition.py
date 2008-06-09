@@ -5,7 +5,7 @@
 # understand what int or None type would be and how to represent it.
 
 import containers
-import utils
+from utils import replace_none
 
 leaf_name = 'leaf'
 tuple_name = 'tuple'
@@ -46,10 +46,7 @@ class specification(object):
     def __init__(self, prototype, invariants = None, **restrictions):
         self.prototype = prototype
         self.restrictions = restrictions
-        if invariants is None:
-            self.invariants = []
-        else:
-            self.invariants = invariants
+        self.invariants = replace_none(invariants, [])
         
 class _type_definition(object):
 
