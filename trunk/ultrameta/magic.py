@@ -6,7 +6,7 @@ from utils import replace_none
     
 class _descriptor(object):
 
-    def __init__(self, reader, writer):
+    def __init__(self, reader, writer = None):
         self._reader = reader
         self._writer = writer
         
@@ -17,20 +17,26 @@ class _descriptor(object):
             return self
             
     def __set__(self, instance, value):
+        if self._writer is None:
+            raise TypeError()
         self._writer(instance, value)
         
     def __delete__(self, instance):
         pass
-
-class _property(object):
+        
+class _ordered_class_attr(object):
 
     order = 0
+    
+    def __init__(self):
+        self._order = _ordered_class_attr.order
+        _ordered_class_attr.order += 1
+
+class _property(_ordered_class_attr):
 
     def __init__(self, prototype):
+        super(_property, self).__init__()
         self._type_definition = type_definition._type_definition(prototype)
-        self._order = _property.order
-        
-        _property.order = _property.order + 1
         
     @property
     def meta_data(self):
@@ -81,13 +87,10 @@ class _identity(_property):
             return self.attr.__hash__()
         return hash
 
-### move the various invariant check functions to the property objects
-### not the main instance.
-        
 def _invariant(boolean_op):
     boolean_op.__is_an_invariant__ = True
     return boolean_op
-
+    
 def _invariant_checked(method):
     def invariants_checked(*args, **kwargs):
         if isinstance(args[0], _object):
@@ -101,6 +104,34 @@ def _invariant_checked(method):
         else:
             return method(*args, **kwargs)
     return invariants_checked
+
+# there is still a little work to do here.
+
+class _derived(_ordered_class_attr):
+
+    def __init__(self, func):
+        super(_derived, self).__init__()
+        self._func = func
+        self._type_definition = type_definition._type_definition(None)
+        
+    @property
+    def meta_data(self):
+        return [self._order, self._type_definition]
+        
+    def create_derived_read_method(self, attr):
+    
+        def read_method(instance):
+            return self._func(instance)
+            
+        return read_method
+        
+    def create_property(self, attr):
+        reader = self.create_derived_read_method(attr)
+        return _descriptor(reader)
+        
+def _derived_property(func):
+    
+    return _derived(func)
 
 class _meta(type):
 
@@ -117,8 +148,11 @@ class _meta(type):
                         id = (v, k)
                     else:
                         ValueError("Multiple identities not allowed.")
+            if isinstance(v, _derived):
+                mods[k] = v.create_property(k)
             if getattr(v, '__is_an_invariant__', False) == True:
                 invariants.append(v)
+             
                 
         if len(invariants) > 0:
             for k, v in dict.iteritems():
@@ -133,7 +167,7 @@ class _meta(type):
             lowest_property = min(i[0] for i in dict['__ultra__'].values())
             for k in dict['__ultra__']:
                 dict['__ultra__'][k][0] = dict['__ultra__'][k][0] - lowest_property
-            _property.order = 0
+            _ordered_class_attr.order = 0
 
         if id is not None:
             v, k = id
@@ -269,7 +303,6 @@ if __name__ == '__main__':
             self.assertEqual(i.a, { 1 : 'one', 2 : 'two' })
             self.assertRaises(TypeError, setattr, i, 'a', { 1 : 1.0, 2 : 2.0 })
             i.a[3] = 'three'
-            print type(i.a)
             self.assertEqual(i.a[3], 'three')
             self.assertRaises(TypeError, i.a.__setitem__, 3, 3.0)
             
@@ -324,6 +357,32 @@ if __name__ == '__main__':
             i.foo(4)
             i.bar()
             
+        def test_derived(self):
+            
+            class u(_object):
+                b = _property([str])
+                
+                def __init__(self, b = None):
+                    super(u, self).__init__()
+                    self.b = replace_none(b, [])
+                    
+
+                @_derived_property
+                def a(self):
+                    return len(self.b)
+
+                @classmethod
+                def foo(cls, bar):
+                    pass
+                    
+                @staticmethod
+                def bar():
+                    pass
+                    
+            i = u(['one', 'two', 'three', 'four'])
+            self.assertEqual(i.a, 4)
+            i.foo(4)
+            i.bar()
             
     suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
     unittest.TextTestRunner(verbosity=2).run(suite)
