@@ -92,7 +92,10 @@ class _type_definition(object):
 
     def _type_repr(self):
         if self._category == leaf_name:
-            return '%s' % self._type.__name__
+            if self._type is not None:
+                return '%s' % self._type.__name__
+            else:
+                return ''
         elif self._category == tuple_name:
             return '(%s)' % ', '.join([i._type_repr() for i in self._tuple_contents])
         elif self._category == sequence_name:
