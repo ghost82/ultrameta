@@ -6,66 +6,71 @@ from utils import replace_none
     
 class _descriptor(object):
 
-    def __init__(self, reader, writer = None):
+    def __init__(self, reader = None, writer = None):
         self._reader = reader
         self._writer = writer
         
     def __get__(self, instance, owner):
         if instance is not None:
+            if self._reader is None:
+                raise TypeError('Attribute does not support read operations.')
             return self._reader(instance)
         else:
             return self
             
     def __set__(self, instance, value):
         if self._writer is None:
-            raise TypeError()
+            raise TypeError('Attribute does not support assignment.')
         self._writer(instance, value)
         
     def __delete__(self, instance):
         pass
-        
-class _ordered_class_attr(object):
 
+class _ordered_class_attr(object):
     order = 0
     
     def __init__(self):
         self._order = _ordered_class_attr.order
         _ordered_class_attr.order += 1
+        
+class _ultra_property(_ordered_class_attr):
 
-class _property(_ordered_class_attr):
-
-    def __init__(self, prototype):
-        super(_property, self).__init__()
-        self._type_definition = type_definition._type_definition(prototype)
+    def __init__(self):
+        super(_ultra_property, self).__init__()
+        self._type_definition = type_definition._type_definition(None)
         
     @property
     def meta_data(self):
         return [self._order, self._type_definition]
         
-    def create_default_read_method(self, attr):
-
-        def read_method(instance):
-            return instance.__dict__[attr]
-            
-        return read_method
-
-    def create_default_write_method(self, attr):
+    def create_read_method(self):
+        raise NotImplementedError()
+        
+    def create_write_method(self):
+        raise NotImplementedError()
+        
+    def create_property(self, attr):
+        return _descriptor(self.create_read_method(attr), self.create_write_method(attr))
     
-        def write_method(instance, val):
+
+class _property(_ultra_property):
+
+    def __init__(self, prototype):
+        super(_property, self).__init__()
+        self._type_definition = type_definition._type_definition(prototype)
+        
+    def create_read_method(self, attr):
+        return lambda instance: instance.__dict__[attr]
+
+    def create_write_method(self, attr):
+        def writer(instance, val):
             if self._type_definition.type_match(val):
                 instance.__dict__[attr] = self._type_definition.proxy(val, 
                     instance.__ultra_do_invariant_checks__)
             else:
                 raise TypeError('%s is type %s not %s' % (val, type(val), self._type_definition))
-            if getattr(instance, '__ultra_invariant_checks__', False):
-                instance.__ultra_do_invariant_checks__()
-                
-        return write_method
-        
-    def create_property(self, attr):
-        reader = self.create_default_read_method(attr)
-        writer = self.create_default_write_method(attr)
-        return _descriptor(reader, writer)
+            instance.__ultra_do_invariant_checks__()
+        return writer
         
 class _identity(_property):
 
@@ -105,33 +110,17 @@ def _invariant_checked(method):
             return method(*args, **kwargs)
     return invariants_checked
 
-# there is still a little work to do here.
-
-class _derived(_ordered_class_attr):
+class _derived_property(_ultra_property):
 
     def __init__(self, func):
-        super(_derived, self).__init__()
+        super(_derived_property, self).__init__()
         self._func = func
-        self._type_definition = type_definition._type_definition(None)
-        
-    @property
-    def meta_data(self):
-        return [self._order, self._type_definition]
-        
-    def create_derived_read_method(self, attr):
-    
-        def read_method(instance):
-            return self._func(instance)
-            
-        return read_method
         
     def create_property(self, attr):
-        reader = self.create_derived_read_method(attr)
-        return _descriptor(reader)
+        return _descriptor(lambda instance: self._func(instance))
         
-def _derived_property(func):
-    
-    return _derived(func)
+def _derived(func):
+    return _derived_property(func)
 
 class _meta(type):
 
@@ -141,18 +130,15 @@ class _meta(type):
         id = None
         invariants = []
         for k, v in dict.iteritems():
-            if isinstance(v, _property):
+            if isinstance(v, _ultra_property):
                 mods[k] = v.create_property(k)
                 if isinstance(v, _identity):
                     if id is None:
                         id = (v, k)
                     else:
                         ValueError("Multiple identities not allowed.")
-            if isinstance(v, _derived):
-                mods[k] = v.create_property(k)
             if getattr(v, '__is_an_invariant__', False) == True:
                 invariants.append(v)
-             
                 
         if len(invariants) > 0:
             for k, v in dict.iteritems():
@@ -367,7 +353,7 @@ if __name__ == '__main__':
                     self.b = replace_none(b, [])
                     
 
-                @_derived_property
+                @_derived
                 def a(self):
                     return len(self.b)
 
@@ -383,6 +369,30 @@ if __name__ == '__main__':
             self.assertEqual(i.a, 4)
             i.foo(4)
             i.bar()
+            
+        def test_inheritance(self):
+        
+            class u(_object):
+                a = _property(str)
+                
+                def __init__(self, a = None):
+                    super(u, self).__init__()
+                    self.a = replace_none(a, '')
+
+            class v(u):
+                b = _property(int)
+                
+                def __init__(self, a = None, b = None):
+                    super(v, self).__init__(a)
+                    self.b = replace_none(b, 0)
+                    
+            i = v('foo', 5)
+            self.assertEqual(i.a, 'foo')
+            self.assertEqual(i.b, 5)
+            self.assertRaises(TypeError, setattr, i, 'a', 3)
+            
+                    
+           
             
     suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
     unittest.TextTestRunner(verbosity=2).run(suite)
