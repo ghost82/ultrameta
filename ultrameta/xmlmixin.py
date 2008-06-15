@@ -8,13 +8,13 @@ class _xml(object):
     
     def to_xml(self, node = None):
         if node is None:
-            node = ElementTree.Element(type(self).__name__)
+            node = ElementTree.Element(type(self).__name__,)
         else:
             node = ElementTree.SubElement(node, type(self).__name__)
 
         for property_name, type_description in type(self)._sorted_properties():
             type_description.subhandler(
-                ElementTree.SubElement(node, property_name),
+                ElementTree.SubElement(node, property_name, type=str(type_description)),
                 getattr(self, property_name),
                 leaf = _xml._to_leaf_xml,
                 tuple = _xml._to_tuple_xml,
@@ -27,7 +27,12 @@ class _xml(object):
     @staticmethod
     def child_node(node, val, val_type):
         if not isinstance(val, _object):
-            return ElementTree.SubElement(node, val_type._type.__name__)
+            tag = val_type.subhandler(
+                leaf = lambda type_description, **kwargs: 'item', 
+                tuple = lambda type_description, **kwargs: 'tuple',
+                sequence = lambda type_description, **kwargs: 'sequence',
+                mapping = lambda type_description, **kwargs: 'mapping')
+            return ElementTree.SubElement(node, tag, type=str(val_type))
         else:
             return node
                 
@@ -41,7 +46,7 @@ class _xml(object):
     @staticmethod
     def _to_sequence_xml(type_description, node, val, **kwargs):
         contents = type_description._contents
-        for position, item in enumerate(val):
+        for item in val:
             child = _xml.child_node(node, item, contents)
             contents.subhandler(child, item, **kwargs)
             
@@ -144,6 +149,17 @@ if __name__ == '__main__':
                 self.first = [a_i]
             else:
                 self.first = []
+                
+    class d(_object, _xml):
+        
+        first = _property([[int]])
+        
+        def __init__(self, first = None):
+            super(d, self).__init__()
+            if first is not None:
+                self.first = first
+            else:
+                self.first = []
     
     class Tests(unittest.TestCase):
     
@@ -151,6 +167,7 @@ if __name__ == '__main__':
             self.test_a = a(4, 'four', 4.01)
             self.test_b = b()
             self.test_c = c(self.test_a)
+            self.test_d = d([[2, 4, 6], [1, 3, 5]])
                     
         def test_atoms(self):
             xml = self.test_a.to_xml()
@@ -158,7 +175,7 @@ if __name__ == '__main__':
             self.assertEqual(xml.find('first').text, '4')
             self.assertEqual(xml.find('second').text, 'four')
             self.assertEqual(xml.find('third').text, '4.01')
-            self.assertEqual(ElementTree.tostring(xml), '<a><first>4</first><second>four</second><third>4.01</third></a>')
+            self.assertEqual(ElementTree.tostring(xml), '<a><first type="int">4</first><second type="str">four</second><third type="float">4.01</third></a>')
             
         def test_roundtrip(self):
             test_a2 = a.from_xml(self.test_a.to_xml())
@@ -174,7 +191,11 @@ if __name__ == '__main__':
             
         def test_containment(self):
             test_c2 = c.from_xml(self.test_c.to_xml())
-            self.assertEqual(test_c2.first[0].first, self.test_c.first[0].first)        
+            self.assertEqual(test_c2.first[0].first, self.test_c.first[0].first)
+            
+        def test_nesting(self):
+            test_d2 = d.from_xml(self.test_d.to_xml())
+            self.assertEqual(test_d2.first[0][1], self.test_d.first[0][1])
                 
     suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
     unittest.TextTestRunner(verbosity=2).run(suite)

@@ -90,21 +90,24 @@ class _type_definition(object):
         else:
             return self._proxy(val).withtype(self).withinvariants(do_invariant_checks)
 
-    def _type_repr(self):
+    def type_repr(self):
         if self._category == leaf_name:
             if self._type is not None:
                 return '%s' % self._type.__name__
             else:
                 return ''
         elif self._category == tuple_name:
-            return '(%s)' % ', '.join([i._type_repr() for i in self._tuple_contents])
+            return '(%s)' % ', '.join([i.type_repr() for i in self._tuple_contents])
         elif self._category == sequence_name:
-            return '[%s]' % self._contents._type_repr()
+            return '[%s]' % self._contents.type_repr()
         else:
-            return '{%s: %s}' % (self._key_contents._type_repr(), self._value_contents._type_repr())
+            return '{%s: %s}' % (self._key_contents.type_repr(), self._value_contents.type_repr())
             
     def __repr__(self):
-        return 'ultra._type_description(' + self._type_repr() + ')'
+        return 'ultra._type_description(' + self.type_repr() + ')'
+        
+    def __str__(self):
+        return self.type_repr()
 
 
 if __name__ == '__main__':
