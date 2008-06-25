@@ -37,7 +37,10 @@ class _xmlbehavior(object):
         if self.metanames != _xmlbehavior._default_metanames:
             rval['metanames'] = self.metanames
         if self.tag_name_editor is not None:
-            rval['tag_name_editor'] = self.tag_name_editor.__name__
+            if self.tag_name_editor.__module__ == 'tagnameeditors':
+                rval['tag_name_editor'] = 'builtin:%s' % self.tag_name_editor.__name__
+            else:
+                rval['tag_name_editor'] = 'custom:%s' % self.tag_name_editor.__name__
         return rval
             
 class _xml(object):
@@ -140,8 +143,21 @@ class _xml(object):
     @classmethod
     def from_xml(cls, node, behavior = None):
         rval = cls()
+        
         if behavior is None:
-            behavior = _xmlbehavior()
+            display_attributes = node.get('display_attributes')
+            metanames = node.get('metanames')
+            tag_name_editor = node.get('tag_name_editor')
+            if tag_name_editor is not None:
+                if tag_name_editor[0:len('builtin:') ] == 'builtin:':
+                    editor_name = tag_name_editor[len('builtin:'):]
+                    tag_name_editor = getattr(tagnameeditors, editor_name)
+                else:
+                    tag_name_editor = None
+            behavior = _xmlbehavior(display_attributes = display_attributes, 
+                metanames = metanames,
+                tag_name_editor = tag_name_editor)
+                
         for child in node:
             unrenamed_tag_choices = behavior.unrename(child.tag)
             tag = None
@@ -170,6 +186,7 @@ if __name__ == '__main__':
     import unittest
     from magic import _property
     import tagnameeditors
+    from utils import replace_none
     
     class a(_object, _xml):
         
@@ -201,10 +218,7 @@ if __name__ == '__main__':
         
         def __init__(self, a_i = None):
             super(c, self).__init__()
-            if a_i is not None:
-                self.first = [a_i]
-            else:
-                self.first = []
+            self.first = replace_none(a_i, [], [a_i])
                 
     class d(_object, _xml):
         
@@ -212,10 +226,7 @@ if __name__ == '__main__':
         
         def __init__(self, first = None):
             super(d, self).__init__()
-            if first is not None:
-                self.first_slot = first
-            else:
-                self.first_slot = []
+            self.first_slot = replace_none(first, [])
     
     class Tests(unittest.TestCase):
     
@@ -233,7 +244,7 @@ if __name__ == '__main__':
             self.assertEqual(xml.find('First').text, '4')
             self.assertEqual(xml.find('Second').text, 'four')
             self.assertEqual(xml.find('Third').text, '4.01')
-            self.assertEqual(ElementTree.tostring(xml), '<A display_attributes="false" tag_name_editor="capitalize"><First>4</First><Second>four</Second><Third>4.01</Third></A>')
+            self.assertEqual(ElementTree.tostring(xml), '<A display_attributes="false" tag_name_editor="builtin:capitalize"><First>4</First><Second>four</Second><Third>4.01</Third></A>')
             
         def test_roundtrip(self):
             test_a2 = a.from_xml(self.test_a.to_xml())
@@ -252,9 +263,7 @@ if __name__ == '__main__':
             self.assertEqual(test_c2.first[0].first, self.test_c.first[0].first)
             
         def test_nesting(self):
-            test_d2 = d.from_xml(self.test_d.to_xml(behavior = _xmlbehavior(tagnameeditors.capitalize)),
-                        behavior = _xmlbehavior(tagnameeditors.capitalize))
-            print test_d2.first_slot
+            test_d2 = d.from_xml(self.test_d.to_xml(behavior = _xmlbehavior(tagnameeditors.capitalize)))
             self.assertEqual(test_d2.first_slot[0][1], self.test_d.first_slot[0][1])
                 
     suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
