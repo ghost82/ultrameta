@@ -320,10 +320,11 @@ class MagicTests(unittest.TestCase):
 
 if __name__ == '__main__':
 
-    suite = unittest.TestLoader().loadTestsFromTestCase(ContainerTests)
+    suite1 = unittest.TestLoader().loadTestsFromTestCase(ContainerTests)
     suite2 = unittest.TestLoader().loadTestsFromTestCase(TypeDefinitionTests)
     suite3 = unittest.TestLoader().loadTestsFromTestCase(MagicTests)
-    unittest.TextTestRunner(verbosity=2).run(suite)
-    unittest.TextTestRunner(verbosity=2).run(suite2)
-    unittest.TextTestRunner(verbosity=2).run(suite3)
+    master = unittest.TestSuite()
+    master.addTests((suite1, suite2, suite3))
+    unittest.TextTestRunner(verbosity=1).run(master)
+
     
