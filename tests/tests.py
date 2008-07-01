@@ -1,6 +1,6 @@
 import unittest
 
-import containers
+import ultrameta.containers
 import type_definition
 import validators
 import magic
