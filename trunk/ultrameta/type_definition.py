@@ -1,7 +1,69 @@
 #/usr/bin/env python
 
-import containers
 from utils import replace_none
+import containers
+import unittest
+
+class TypeDefinitionTests(unittest.TestCase):
+    
+    def setUp(self):
+        self.tlc = Specification(str, validation=validators.length(3))
+        self.small = Specification(int, validation=validators.bounds(minimum = 0, maximum = 8))
+        
+        self.atom_type = TypeDefinition(str)
+        self.restriction_str = TypeDefinition(self.tlc)
+        self.restriction_int = TypeDefinition(self.small)
+        
+        self.list_type = TypeDefinition([int])
+        self.restriction_list = TypeDefinition([self.tlc])
+        
+        self.map_type = TypeDefinition({int: str})
+        self.restriction_map_key = TypeDefinition({self.tlc: int})
+        self.restriction_map_val = TypeDefinition({int: self.tlc})
+
+        self.tuple_type = TypeDefinition((int, str, float))
+        self.mixed_type = TypeDefinition([{(int, int): str}])
+    
+    def test_atom(self):
+        self.assertEqual(self.atom_type.type_match(12), False)
+        self.assertEqual(self.atom_type.type_match('any string'), True)
+        
+    def test_restriction(self):
+        self.assertEqual(self.restriction_str.type_match('foo'), True)
+        self.assertEqual(self.restriction_str.type_match('foobar'), False)
+        
+    def test_range(self):
+        self.assertEqual(self.restriction_int.type_match(3), True)
+        self.assertEqual(self.restriction_int.type_match(10), False)
+
+    def test_list(self):
+        self.assertEqual(self.list_type.type_match(4), False)
+        self.assertEqual(self.list_type.type_match([4]), True)
+        
+    def test_list_restriction(self):
+        self.assertEqual(self.restriction_list.type_match(['foo', 'bar']), True)
+        self.assertEqual(self.restriction_list.type_match(['foobar', 'a']), False)
+
+    def test_map(self):
+        self.assertEqual(self.map_type.type_match({1: 'a', 2: 'bb', 3: 'cccc'}), True)
+        self.assertEqual(self.map_type.type_match({1: 'a', 'a': 1}), False)
+        
+    def test_map_restriction_key(self):
+        self.assertEqual(self.restriction_map_key.type_match({'abc': 123}), True)
+        self.assertEqual(self.restriction_map_key.type_match({'a': 123}), False)
+        
+    def test_map_restriction_value(self):
+        self.assertEqual(self.restriction_map_val.type_match({1: 'abc'}), True)
+        self.assertEqual(self.restriction_map_val.type_match({1: 'a'}), False)
+        
+    def test_others(self):
+        self.assertEqual(self.tuple_type.type_match((1, 'a', 4.5)), True)
+        self.assertEqual(self.tuple_type.type_match((1, 'abc')), False)
+        
+    def test_mixed(self):
+        self.assertEqual(self.mixed_type.type_match([{(1, 3) : 'onethree', (0, 1) : 'zeroone'},
+            { (0, 0) : 'done' }]), True)
+
 
 leaf_name = 'leaf'
 tuple_name = 'tuple'
@@ -105,3 +167,5 @@ class TypeDefinition(object):
     def __str__(self):
         return self._type_repr()
     
+if __name__ == '__main__':
+    unittest.TextTestRunner(verbosity=2).run(unittest.TestLoader().loadTestsFromTestCase(TypeDefinitionTests))        

@@ -2,6 +2,7 @@
 
 from utils import replace_none
 from itertools import izip
+import unittest
 
 def InvariantChecked(self, func):
     
@@ -73,4 +74,54 @@ class DictionaryProxy(dict, WithMixin):
             super(DictionaryProxy, self).__setitem__(key, val)
         else:
             raise TypeError('%s is not a %s' % ((key, val), self._type_definition))
+            
+if __name__ == '__main__':
+
+    class ContainerTests(unittest.TestCase):
+        import type_definition
+    
+        def append(list, val):
+            list.append(val)
+            
+        def assign(map, key, val):
+            map[key] = val
+        
+        def test_list_of_int(self):
+            type_def = self.type_definition.TypeDefinition([int])
+            test_list = ListProxy([1, 2, 3]).withtype(type_def)
+            self.assertEqual(test_list, [1, 2, 3])
+            self.assertEqual(test_list[1], 2)
+            self.assertEqual(len(test_list), 3)
+           
+        def test_type_safe_list_of_int(self):
+            type_def = self.type_definition.TypeDefinition([int])
+            test_list = ListProxy([]).withtype(type_def)
+            self.assertRaises(TypeError, self.append, test_list, 'a')
+            
+        def test_map_from_str_to_int(self):
+            type_def = self.type_definition.TypeDefinition({str:int})
+            test_map = DictionaryProxy({'a' : 1, 'b' : 2}).withtype(type_def)
+            self.assertEqual(test_map['a'], 1)
+            test_map = DictionaryProxy({'a' : 1, 'b' : 'c'})
+            self.assertRaises(TypeError, test_map.withtype, type_def)
+            
+        def test_type_safe_map_from_str_to_int(self):
+            type_def = self.type_definition.TypeDefinition({str:int})
+            test_map = DictionaryProxy({}).withtype(type_def)
+            self.assertRaises(TypeError, self.assign, test_map, 1, 1)
+            self.assertRaises(TypeError, self.assign, test_map, 'a', 'a')
+            
+        def test_tuple_int_int_str_int(self):
+            type_def = self.type_definition.TypeDefinition((int, int, str, int))
+            test_tuple = TupleProxy((1, 2, 'c', 3)).withtype(type_def)
+            self.assertEqual(test_tuple, (1, 2, 'c', 3))
+            self.assertEqual(test_tuple[1], 2)
+            self.assertRaises(TypeError, self.assign, test_tuple, 2, 4)
+            
+        def test_tuple_type_safety(self):
+            type_def = self.type_definition.TypeDefinition((int, int, str, int))
+            test_tuple = TupleProxy((1, 2, 3))
+            self.assertRaises(TypeError, test_tuple.withtype, type_def)
+
+    unittest.TextTestRunner(verbosity=2).run(unittest.TestLoader().loadTestsFromTestCase(ContainerTests))        
             

@@ -3,6 +3,10 @@
 import type_definition
 from types import FunctionType
 from utils import replace_none
+
+import unittest
+
+
     
 class Descriptor(object):
 
@@ -181,3 +185,213 @@ class Object(object):
         properties.sort(key=lambda x: x[1][0])
         return [(i[0], i[1][1]) for i in properties]
                 
+if __name__ == '__main__':
+
+    class MagicTests(unittest.TestCase):
+    
+        def test_property(self):
+            p = Property(int)
+                    
+        def test_object(self):
+            
+            class u(Object):
+                a = Property(int)
+                
+                def __init__(self, init_a):
+                    super(u, self).__init__()
+                    self.a = init_a
+            
+            i = u(2)
+            self.assertEqual(i.a, 2)
+            
+            i.a = 3
+            self.assertEqual(i.a, 3)
+            
+            self.assertRaises(TypeError, setattr, i, 'a', '4')
+    
+            j = u(0)
+            j.a = 4
+            self.assertEqual(j.a, 4)
+            self.assertEqual(i.a, 3)
+            
+        def test_two_properties(self):
+            
+            class u(Object):
+                b = Property(int)
+                a = Property(str)
+                
+                def __init__(self, init_a, init_b):
+                    super(u, self).__init__()
+                    self.a = init_a
+                    self.b = init_b
+                    
+            i = u('one', 1)
+            self.assertEqual(i.a, 'one')
+            self.assertEqual(i.b, 1)
+            self.assertEqual(type(i).__ultra__['a'][0], 1)
+            self.assertEqual(type(i).__ultra__['b'][0], 0)
+            
+        def test_identity(self):
+            
+            class u(Object):
+                a = Identity(str)
+                b = Property(int)
+    
+                def __init__(self, init_a, init_b):
+                    super(u, self).__init__()
+                    self.a = init_a
+                    self.b = init_b
+                    
+            i = u('one', 1)
+            self.assertEqual(i.a, 'one')
+            self.assertEqual(i.b, 1)
+            self.assertEqual(type(i).__ultra__['a'][0], 0)
+            self.assertEqual(type(i).__ultra__['b'][0], 1)
+            
+            j = u('one', 2)
+            self.assertEqual(i, j)
+            j.a = 'two'
+            self.assertNotEqual(i, j)
+            
+        def test_collections(self):
+            
+            class u(Object):
+                a = Property([int])
+                
+                def __init__(self, init_a = None):
+                    super(u, self).__init__()
+                    self.a = replace_none(init_a, [])
+                        
+            i = u()
+            
+            self.assertEqual(i.a, [])
+            i.a = [1, 2, 3]
+            self.assertEqual(i.a, [1, 2, 3])
+            self.assertRaises(TypeError, setattr, i, 'a', [1, 2, 'three'])
+            i.a.append(4)
+            self.assertEqual(i.a, [1, 2, 3, 4])
+            self.assertRaises(TypeError, i.a.append, 'four')
+            i.a[1:3] = [5, 6]
+            self.assertEqual(i.a, [1, 5, 6, 4])
+            self.assertRaises(TypeError, i.a.__setslice__, 1, 3, ['one', 'two'])
+            
+        def test_mappings(self):
+            
+            class u(Object):
+                a = Property({int:str})
+                
+                def __init__(self, init_a = None):
+                    super(u, self).__init__()
+                    self.a = replace_none(init_a, {})
+                        
+            i = u()
+            
+            self.assertEqual(i.a, {})
+            i.a = { 1 : 'one', 2 : 'two' }
+            self.assertEqual(i.a, { 1 : 'one', 2 : 'two' })
+            self.assertRaises(TypeError, setattr, i, 'a', { 1 : 1.0, 2 : 2.0 })
+            i.a[3] = 'three'
+            self.assertEqual(i.a[3], 'three')
+            self.assertRaises(TypeError, i.a.__setitem__, 3, 3.0)
+            
+        def test_depth(self):
+        
+            class u(Object):
+                a = Property([[int]])
+                
+                def __init__(self, init_a = None):
+                    super(u, self).__init__()
+                    self.a = replace_none(init_a, [])
+                        
+            i = u()
+            i.a = [[1, 2], [3, 4]]
+            self.assertEqual(i.a, [[1, 2], [3, 4]])
+            self.assertRaises(TypeError, i.a.append, 4)
+            self.assertRaises(TypeError, i.a.append, ['a', 'b'])
+            
+        def test_invariant(self):
+            
+            class u(Object):
+                a = Property(int)
+                b = Property([str])
+                
+                def __init__(self, a = 0, b = None):
+                    super(u, self).__init__()
+                    self.a = a
+                    self.b = replace_none(b, [])
+                    
+                @Invariant
+                def verify(self):
+                    return len(self.b) == self.a
+                    
+                def modify(self, a, b):
+                    self.a = a
+                    self.b = b
+                    
+                @classmethod
+                def foo(cls, bar):
+                    pass
+                    
+                @staticmethod
+                def bar():
+                    pass
+                    
+            i = u()
+            i.modify(2, ['one', 'two'])
+            self.assertRaises(ValueError, setattr, i, 'a', 3)
+            i.a = 2
+            self.assertRaises(ValueError, i.b.append, 'three')
+            i.a = 3
+            i.foo(4)
+            i.bar()
+            
+        def test_derived(self):
+            
+            class u(Object):
+                b = Property([str])
+                
+                def __init__(self, b = None):
+                    super(u, self).__init__()
+                    self.b = replace_none(b, [])
+                    
+    
+                @Derived
+                def a(self):
+                    return len(self.b)
+    
+                @classmethod
+                def foo(cls, bar):
+                    pass
+                    
+                @staticmethod
+                def bar():
+                    pass
+                    
+            i = u(['one', 'two', 'three', 'four'])
+            self.assertEqual(i.a, 4)
+            i.foo(4)
+            i.bar()
+            
+        def test_inheritance(self):
+        
+            class u(Object):
+                a = Property(str)
+                
+                def __init__(self, a = None):
+                    super(u, self).__init__()
+                    self.a = replace_none(a, '')
+    
+            class v(u):
+                b = Property(int)
+                
+                def __init__(self, a = None, b = None):
+                    super(v, self).__init__(a)
+                    self.b = replace_none(b, 0)
+                    
+            i = v('foo', 5)
+            self.assertEqual(i.a, 'foo')
+            self.assertEqual(i.b, 5)
+            self.assertRaises(TypeError, setattr, i, 'a', 3)
+    
+    unittest.TextTestRunner(verbosity=2).run(unittest.TestLoader().loadTestsFromTestCase(MagicTests))
+    
