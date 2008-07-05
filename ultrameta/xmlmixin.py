@@ -2,7 +2,7 @@
 
 from itertools import izip
 from xml.etree import ElementTree
-from magic import _object
+from magic import Object
 
 class _xmlbehavior(object):
 
@@ -70,7 +70,7 @@ class _xml(object):
         
     @staticmethod
     def child_node(node, val, val_type, behavior):
-        if not isinstance(val, _object):
+        if not isinstance(val, Object):
             tag = val_type.subhandler(
                 leaf = lambda type_description, **kwargs: behavior.rename(behavior.metanames['item']), 
                 tuple = lambda type_description, **kwargs: behavior.rename(behavior.metanames['tuple']),
@@ -85,7 +85,7 @@ class _xml(object):
                 
     @staticmethod
     def _to_leaf_xml(type_description, node, val, behavior, **kwargs):
-        if isinstance(val, _object):
+        if isinstance(val, Object):
             val.to_xml(node)
         else:
             node.text = str(val)
@@ -184,15 +184,15 @@ class _xml(object):
 if __name__ == '__main__':
     
     import unittest
-    from magic import _property
+    from magic import Property
     import tagnameeditors
     from utils import replace_none
     
-    class a(_object, _xml):
+    class a(Object, _xml):
         
-        first = _property(int)
-        second = _property(str)
-        third = _property(float)
+        first = Property(int)
+        second = Property(str)
+        third = Property(float)
         
         def __init__(self, i_first=0, i_second='', i_third=0.0):
             super(a, self).__init__()
@@ -200,11 +200,11 @@ if __name__ == '__main__':
             self.second = i_second
             self.third = i_third
             
-    class b(_object, _xml):
+    class b(Object, _xml):
         
-        first = _property([int])
-        second = _property({int: int})
-        third = _property((str, int, float))
+        first = Property([int])
+        second = Property({int: int})
+        third = Property((str, int, float))
         
         def __init__(self):
             super(b, self).__init__()
@@ -212,17 +212,17 @@ if __name__ == '__main__':
             self.second = {0: 1, 1: 3}
             self.third = ('a', 0, 1.0)
             
-    class c(_object, _xml):
+    class c(Object, _xml):
         
-        first = _property([a])
+        first = Property([a])
         
         def __init__(self, a_i = None):
             super(c, self).__init__()
             self.first = replace_none(a_i, [], [a_i])
                 
-    class d(_object, _xml):
+    class d(Object, _xml):
         
-        first_slot = _property([[int]])
+        first_slot = Property([[int]])
         
         def __init__(self, first = None):
             super(d, self).__init__()
