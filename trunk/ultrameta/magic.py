@@ -5,8 +5,6 @@ from types import FunctionType
 from utils import replace_none
 
 import unittest
-
-
     
 class Descriptor(object):
 
